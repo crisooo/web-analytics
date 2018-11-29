@@ -1,0 +1,53 @@
+#Download RSiteCatalyst or Load it when neccesary
+if(!require(RSiteCatalyst)) install.packages("RSiteCatalyst")
+library(RSiteCatalyst)
+
+#Authentication & Set report suite
+SCAuth("XX", "XXX")
+my.rsid <- "whg-intl-prod-v3"
+
+# Available variables
+segments.available <- GetSegments(my.rsid)
+metrics.available <- GetMetrics(my.rsid)
+elements.available <- GetElements(my.rsid)
+evars.available <- GetEvars(my.rsid)
+
+# Metrics to export
+vegasVisits <- metrics.available$id[metrics.available$name == "Vegas - Visits"]
+casinoVisits <- metrics.available$id[metrics.available$name == "Casino - Visits"]
+livecasinoVisits <- metrics.available$id[metrics.available$name == "Live Casino - Visits"]
+
+vegasGL <- metrics.available$id[metrics.available$name == "Vegas - Games Launched"]
+casinoGL <- metrics.available$id[metrics.available$name == "Casino - Games Launched"]
+livecasinoGL <- metrics.available$id[metrics.available$name == "Live Casino - Games Launched"]
+
+
+#QueueRanked
+QueueRanked <- QueueRanked(my.rsid, 
+                             date.from = refDate - 30,
+                             date.to = refDate - 1, 
+                             metrics = myMetrics$id,
+                             elements = "evar11",
+                             selected = selectedAccountNumbers,
+                             interval.seconds	= 60,
+                             max.attempts = 120
+                             ) 
+                             
+#Trended
+QueueTrended <- QueueTrended(my.rsid, 
+                                        date.from = "2018-05-10",
+                                        date.to = Sys.Date()-1, 
+                                        metrics = c("cm631_5aaa72c3a90b46030caf552c", "cm631_5aaa73c0d88ec634510adf61"),
+                                        elements = "evar11",
+                                        top = 20000
+) 
+
+AccountsRolling2 <- QueueTrended(my.rsid, 
+                                date.from = "2018-05-10",
+                                date.to = Sys.Date()-1, 
+                                metrics = metrics.available$id[metrics.available$name %in% c("Live Casino - SB Visits")],
+                                elements = "evar11",
+                                top = 20
+) 
+
+                             

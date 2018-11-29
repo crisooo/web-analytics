@@ -1,66 +1,100 @@
-
-
-
-
-
 #export files as i can´t export Experience cloud id with RsiteCatalyst
 
+install.packages("RSiteCatalyst")
 install.packages("tidyverse")
 install.packages("skimr")
+library(RSiteCatalyst)
 library(tidyverse)
 library(skimr)
 
-bothGroups_mobile = read_csv("C:/Users/crgarcia/Desktop/GCCAbTest/bothGroups_mobile.csv")
+setwd("Z:/Documents/CG/AB testing/ABSO - Live Casino QP/Data Sources") #CHANGE#
+visits <- read_csv("visits.csv")
+launches <- read_csv("gamesLaunched.csv")
+
+#CHANGE# - #Name of the segments 
+control <- "QP AB test - Control - No Quick Play"
+variant <- "QP AB test - Variant -  Quick Play"
+
+#merge visits and launches
+colnames(visits)
+dataMerge <- left_join(visits, launches, by= c("Date", "Marketing Cloud Visitor ID", control, variant))
+
+#prettyfying
+colnames(dataMerge) <- c("date", "mid", "control", "variant", "visits", "gamesLaunched")
+dataMerge$date <- as.Date(dataMerge$date, format = "%B %d, %Y")
+
+#add column for conversion and remove 0s
+dataMerge[is.na(dataMerge)] <- 0
+dataMerge$conversion <- dataMerge$gamesLaunched
+dataMerge$conversion[dataMerge$conversion>0] <- 1
+
+write_csv(dataMerge, "export.csv")
+
+#column for group & remove the originals
+dataMerge$group <- "to-do"
+dataMerge$group[dataMerge$control > 0] <- "Control"
+dataMerge$group[dataMerge$variant > 0] <- "Variant"
+dataMerge$group[dataMerge$control == 0 & dataMerge$variant == 0] <- "None"
+
+dataMerge <- select(dataMerge, -c(control, variant)) #remove columns
+
+#count per group
+summary <- dataMerge %>%
+  group_by(group) %>%
+  summarise(count = n_distinct(mid),
+            visits = sum(visits),
+            launches = sum(gamesLaunched))
+
+n_distinct <- n_distinct(dataMerge)
+
+dataMerge <- filter(dataMerge, dataMerge$group != "None")
+
+#AB TEST#
 
 #1: •	Look at the distribution of the variable (if it is not skewed a lot then perhaps no transformation is needed)
-skim(bothGroups_mobile)
-summary(bothGroups_mobile)
-boxplot(bothGroups_mobile$gamesLaunched ~ bothGroups_mobile$group)
-hist(bothGroups_mobile$gamesLaunched, breaks = 100, xlim = c(0,20))
+skim(dataMerge)
+summary(dataMerge)
+boxplot(dataMerge$gamesLaunched ~ dataMerge$group)
 
-hist(bothGroups_mobile$gamesLaunched[bothGroups_mobile$group == "Control"], breaks = 100, xlim = c(0,20))
-hist(bothGroups_mobile$gamesLaunched[bothGroups_mobile$group == "Variant"], breaks = 100, xlim = c(0,20))
-
-ggplot(bothGroups_mobile, aes(x=gamesLaunched)) + 
+ggplot(dataMerge, aes(x=gamesLaunched)) + 
   geom_histogram(col="grey70", 
                  binwidth = 1,
                  aes(fill=group, #fill gives them colour
-                   group=group),#group makes 2 lines
-               alpha=0.9) + #alpha is how translucid. <alpha <opaque
+                     group=group),#group makes 2 lines
+                 alpha=0.9) + #alpha is how translucid. <alpha <opaque
   xlim(0,50) + #x-axis
   ylim(0,5000) +
   facet_wrap(~group) + #one box for each period
-  scale_fill_manual(values=c("indianred2", "skyblue3")) + #change color 
+#  scale_fill_manual(values=c("indianred2", "skyblue3")) + #change color 
   theme_bw() + theme(legend.position="none") #change theme/background
 
 
 
 #2: •	Look at the distribution of the sample mean 
-a <- replicate(10000, sample(x = bothGroups_mobile$gamesLaunched, size = 1000, replace = T))
+a <- replicate(10000, sample(x = dataMerge$gamesLaunched, size = 1000, replace = T))
 #For the data you gave me I sampled 10000 times 1000 observations (like the guy in the blog did)
 b <- colMeans(a)
 hist(a)
 hist(b) #distribution of the sample mean
 qqnorm(b) #checked if the normality of the sample mean holds using a q-q plot.
-shapiro.test(bothGroups_mobile$gamesLaunched) #this is an actual number to prove normality but only works for smaller data sets. #p-value > 0.05 distribution is normal
+#shapiro.test(dataMerge$gamesLaunched) #this is an actual number to prove normality but only works for smaller data sets. #p-value > 0.05 distribution is normal
 
 
 #3: •	Try transforming the variable and do again the above
-a2 <- replicate(10000, sample(x = log(bothGroups_mobile$gamesLaunched +1), size = 1000, replace = T))
+a2 <- replicate(10000, sample(x = log(dataMerge$gamesLaunched +1), size = 1000, replace = T))
 b2 <- colMeans(a2)
 hist(a2)
 hist(b2)
 qqnorm(b2)
 
 # In the 2nd graph we almost have a straight diagonal line unlike the 1st.
- # my suggestion is to first transform  the data and then apply a t-test. 
- # Note that this is not exactly equivalent to applying a t-test to the untransformed data, hence you may get slightly different results. 
- # As a rule of thumb the transformed test will tend to consider more important the differences when the numbers are small 
- # (e.g. the difference between 1 and 2 games launched is given higher “significance” that the difference between 9 and 10 games launched).
+# my suggestion is to first transform  the data and then apply a t-test. 
+# Note that this is not exactly equivalent to applying a t-test to the untransformed data, hence you may get slightly different results. 
+# As a rule of thumb the transformed test will tend to consider more important the differences when the numbers are small 
+# (e.g. the difference between 1 and 2 games launched is given higher “significance” that the difference between 9 and 10 games launched).
 
 
 #final: run test
-wilcox.test(gamesLaunched ~ group, data = bothGroups_mobile)
-t.test(gamesLaunched ~ group, data = bothGroups_mobile)
-t.test(log(gamesLaunched+1) ~ group, data = bothGroups_mobile)
-
+wilcox.test(gamesLaunched ~ group, data = dataMerge)
+t.test(gamesLaunched ~ group, data = dataMerge)
+t.test(log(gamesLaunched+1) ~ group, data = dataMerge)

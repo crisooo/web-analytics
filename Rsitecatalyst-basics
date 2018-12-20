@@ -39,7 +39,8 @@ QueueTrended <- QueueTrended(my.rsid,
                                         date.to = Sys.Date()-1, 
                                         metrics = c("cm631_5aaa72c3a90b46030caf552c", "cm631_5aaa73c0d88ec634510adf61"),
                                         elements = "evar11",
-                                        top = 20000
+                                        top = 20000,
+                                        date.granularity = "hour"
 ) 
 
 AccountsRolling2 <- QueueTrended(my.rsid, 

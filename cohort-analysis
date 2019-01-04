@@ -168,3 +168,18 @@ ggplot(plotdata, aes(x = cohort_age, y = reorder(cohort, desc(cohort)))) +
 
 
 
+#### TOTALS ####
+  # This is done manually by adding the totals. Should automate!!
+
+tplotdata <- data.frame(
+  cohort     = c("TOTAL","TOTAL","TOTAL","TOTAL","TOTAL"),
+  cohort_age = c("W0","W1","W2","W3","W4"),
+  percentage = c(1,0.141495473537604,0.0895282033426184,0.0309453342618384,0.00478760445682451),
+  label      = c(22976,"14%","9%","3%", "0%")
+)
+
+
+ggplot(tplotdata, aes(x = cohort_age, y = reorder(cohort, desc(cohort)))) +
+  geom_raster(aes(fill = percentage)) +
+  scale_fill_continuous(guide = FALSE) + # no legend
+  geom_text(aes(label = label), color = "white") 

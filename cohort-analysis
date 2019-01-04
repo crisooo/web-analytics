@@ -1,0 +1,170 @@
+if(!require(RSiteCatalyst)) install.packages("tidyverse")
+if(!require(RSiteCatalyst)) install.packages("lubridate")
+library(lubridate)
+library(tidyverse)
+
+
+setwd("Z:/Documents/CG/Lobbies/Live casino/Launch to Stake/Retention")
+adobeQP <- read_csv("qplaunches.csv")
+adobeAll <- read_csv("launches.csv")
+fiscalweeks <- read_csv("C:/Users/crgarcia/Desktop/20182019FiscalYear.csv")
+weeks <- read_csv("weeks.csv")
+
+#### 1. DATA EXTRACTION AND CLEANUP ####
+
+# 1.1. Prettyfying
+colnames(adobeQP) <- c("date","customeraccountnumber", "QPgamesLaunched")
+adobeQP$date <- as.Date(adobeQP$date, format = "%B %d, %Y")
+
+colnames(adobeAll) <- c("date","customeraccountnumber", "gamesLaunched")
+adobeAll$date <- as.Date(adobeAll$date, format = "%B %d, %Y")
+
+adobe <- full_join(adobeQP, adobeAll)
+
+fiscalweeks <- fiscalweeks %>% 
+  select(-(NaturalYear:FiscalWeek)) %>%
+  select(-FiscalYearMonth)
+
+fiscalweeks$Date <- as.Date(fiscalweeks$Date, format = "%d/%m/%Y")
+fiscalweeks$FirstFiscalWeekDay <- as.Date(fiscalweeks$FirstFiscalWeekDay, format = "%d/%m/%Y")
+
+weeks$Date <- as.Date(weeks$Date, format = "%d/%m/%Y")
+
+
+adobe <- left_join(adobe, fiscalweeks, by = c("date" = "Date"))
+
+adobe$QPgamesLaunched <- as.integer(adobe$QPgamesLaunched)
+adobe[is.na(adobe)] <- 0 
+str(adobe)
+
+
+# 1.2. Make the data weekly
+
+adobeWeek <- adobe %>% 
+  group_by(FirstFiscalWeekDay,
+           customeraccountnumber) %>% 
+  filter(customeraccountnumber != 0) %>%
+  summarise(QPgamesLaunched = sum(QPgamesLaunched),
+            gamesLaunched = sum(gamesLaunched)
+  )
+
+
+# 1.3. Help columns for active days
+
+adobeWeek$qpActiveDays[adobeWeek$QPgamesLaunched > 0] <- 1
+adobeWeek$activeDays[adobeWeek$gamesLaunched > 0] <- 1
+adobeWeek[is.na(adobeWeek)] <- 0 
+
+str(adobeWeek)
+
+
+# 1.4. Extract the first week
+
+firstDate <-  adobeWeek %>% 
+  filter(QPgamesLaunched > 0) %>% 
+  group_by(customeraccountnumber) %>% 
+  arrange(FirstFiscalWeekDay) %>% 
+  slice(1) %>% # takes the first occurrence if there is a tie
+  ungroup() %>%
+  select(-(QPgamesLaunched:activeDays))
+
+colnames(firstDate) <- c("cohort", "customeraccountnumber")
+
+
+# 1.5. Join df with first date
+cohort <- left_join(adobeWeek, firstDate, by = "customeraccountnumber")
+
+str(firstDate)
+str(weeks)
+
+
+# 1.6. create a difference between date and initial date
+
+cohort$diff <- as.numeric(difftime(cohort$FirstFiscalWeekDay,cohort$cohort,units = c("days"))/7)
+
+
+# 1.7. Leave Only QP
+
+qpCohort <- cohort %>% 
+  filter(QPgamesLaunched > 0)
+
+
+
+#### 2. PLOT PREPARATION ####
+
+# https://stuifbergen.com/2018/03/cohort-analysis-with-snowplow-and-r/
+
+
+# 2.1. Create the table with volumes
+
+  # 1 row for each cohort group
+  # 1 column for each value in the Age_by_Month column;0-11
+  # The default aggregation setup for dcast is, fun.aggregate = length
+
+qpCohort.wide <- reshape2::dcast(qpCohort,cohort~diff,
+                                value.var="customeraccountnumber",
+                                fun.aggregate = length)
+
+
+# 2.2. Create new table with percentages
+
+qpCohort.pct <- data.frame(
+  cohort = qpCohort.wide$cohort, # first column
+  qpCohort.wide[,2:ncol(qpCohort.wide)] / qpCohort.wide[["0"]] # rest: divide by week.0
+)
+
+  # Replace the "X" by "W"
+names(qpCohort.pct) <- gsub(x = names(qpCohort.pct), pattern = "\\X", replacement = "W")  
+
+
+
+#### 3. THE PLOT ####
+
+# 3.1. Put data in ggplot format 
+  # ggplot loves long data so we need to gather it back. One for the absolute values, one for the pcts
+
+plotdata_abs <- gather(qpCohort.wide, "cohort_age", "people",2:ncol(qpCohort.wide))
+plotdata_pct <- gather(qpCohort.pct,  "cohort_age", "percent",2:ncol(qpCohort.pct))
+
+
+# 3.2. Pretty labels.
+# first bit is the length of the width of the wide column (minus 1, that's the cohort name)
+# that contains the absolute numbers
+# last bit is the rest, those are percentages.
+labelnames <- c( plotdata_abs$people[1:(ncol(qpCohort.wide)-1)],
+                 plotdata_pct$percent[(ncol(qpCohort.wide)):(nrow(plotdata_pct))])
+
+
+# 3.3. Make the numbers look pretty
+pretty_print <- function(n) {
+  case_when( n <= 1  ~ sprintf("%1.0f %%", n*100),
+             n >  1  ~ as.character(n),
+             TRUE    ~ " ") # for NA values, skip the label
+}
+
+# 3.4. Create the plot data
+
+plotdata <- data.frame(
+  cohort     = plotdata_pct$cohort,
+  cohort_age = plotdata_pct$cohort_age,
+  percentage = plotdata_pct$percent,
+  label      = pretty_print(labelnames)
+)
+
+
+# 3.5. Finish Chart
+  # We have long-form data with 4 columns. 
+  # The cohort column is used on the y axis, and the cohort_age on the x axis.
+  # Finally, we’re using the percentages for the fill colouring, and the label column for.. labels.
+
+
+# plot (with reordered y axis, oldest group on top)
+ggplot(plotdata, aes(x = cohort_age, y = reorder(cohort, desc(cohort)))) +
+  geom_raster(aes(fill = percentage)) +
+  scale_fill_continuous(guide = FALSE) + # no legend
+  geom_text(aes(label = label), color = "white") +
+  xlab("cohort age") + ylab("cohort") + 
+  ggtitle(paste("Weekly Retention table for Quick Play"))
+
+
+

@@ -167,8 +167,9 @@ ggplot(plotdata, aes(x = cohort_age, y = reorder(cohort, desc(cohort)))) +
   ggtitle(paste("Weekly Retention table for Quick Play"))
 
 
-
 #### TOTALS ####
+
+# 4.1 Totals plot
   # This is done manually by adding the totals. Should automate!!
 
 tplotdata <- data.frame(
@@ -183,3 +184,12 @@ ggplot(tplotdata, aes(x = cohort_age, y = reorder(cohort, desc(cohort)))) +
   geom_raster(aes(fill = percentage)) +
   scale_fill_continuous(guide = FALSE) + # no legend
   geom_text(aes(label = label), color = "white") 
+  
+  
+ #### TOTALS insight #### 
+  # 4.1 How many customers repeated (launched at least once after the first day)
+
+cohortTotal <- cohort %>% 
+  filter(diff > 0) 
+  
+  n_distinct(cohortTotal$customeraccountnumber)

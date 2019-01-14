@@ -28,7 +28,9 @@ QueueRanked <- QueueRanked(my.rsid,
                              date.to = refDate - 1, 
                              metrics = myMetrics$id,
                              elements = "evar11",
+                             top = 50000,
                              selected = selectedAccountNumbers,
+                             segment.id = segments.available$id[segments.available$name == "Tabs = Favourites"],
                              interval.seconds	= 60,
                              max.attempts = 120
                              ) 

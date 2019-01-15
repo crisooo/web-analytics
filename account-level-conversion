@@ -1,0 +1,53 @@
+if(!require(RSiteCatalyst)) install.packages("tidyverse")
+library(tidyverse)
+
+setwd("Z:/Documents/CG/Lobbies/Games/T2_Top of the slots")
+visits <- read_csv("tots_visits.csv")
+opens <- read_csv("tots_opens.csv")
+claims <- read_csv("tots_claims.csv")
+
+# prettyfying
+colnames(visits) <- c("date", "accountId", "visits")
+colnames(opens) <- c("date", "accountId", "opens")
+colnames(claims) <- c("date", "accountId", "claims")
+
+visits$date <- as.Date(visits$date, format = "%B %d, %Y")
+opens$date <- as.Date(opens$date, format = "%B %d, %Y")
+claims$date <- as.Date(claims$date, format = "%B %d, %Y")
+
+join <- full_join(visits, opens)
+join <- full_join(join, claims)
+
+# categorize customers
+join[is.na(join)] <- 0 
+join <- join %>% 
+  filter(accountId != 0)
+join$customerType <- "to-do"
+join$customerType[join$visits == 0] <- "No LP"
+join$customerType[join$visits > 0] <- "Visited LP"
+
+str(join)
+
+# count of account Ids for each step
+output <- join %>% 
+  group_by(customerType) %>%
+  summarise(visited = sum(visits > 0),
+            opened = sum(opens > 0),
+            claimed = sum(claims > 0),
+            lp2claim = claimed/visited,
+            open2claim = claimed/opened
+  )    
+
+# daily count
+dailyOutput <- join %>% 
+  group_by(customerType,
+           date) %>%
+  summarise(visited = sum(visits > 0),
+            opened = sum(opens > 0),
+            claimed = sum(claims > 0),
+            lp2claim = claimed/visited,
+            open2claim = claimed/opened
+  )   
+
+
+write_csv(join, "join.csv")

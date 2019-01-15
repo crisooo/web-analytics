@@ -1,0 +1,98 @@
+install.packages("tidyverse")
+install.packages("reshape2")
+
+library(tidyverse)
+library(reshape2)
+
+# create data samples
+wh.content <- data.frame(content = c('sports', 'gaming', 'othersf',
+                                     'logins', 'loginn', 'loginf',
+                                     'launchs', 'launchn', 'launchf'),
+                         step = c('Visit', 'Visit', 'Visit',
+                                  'Login', 'Login', 'Login',
+                                  'Game launch','Game launch','Game launch'),
+                         number = c(100, 90, 80, 
+                                    50, 40, 30, 
+                                    10, 12, 13))
+
+
+# rename to have clean one to use
+wh.all <- wh.content
+
+# calculating dummies, max and min values of X for plotting
+wh.all <- wh.all %>%
+  group_by(step) %>%
+  mutate(totnum = sum(number)) %>%  #we want to know the total for that step
+  ungroup() %>%
+  mutate(dum = (max(totnum) - totnum)/2, #half the difference between this step and all visits
+         maxx = totnum + dum,
+         minx = dum)
+
+# data frame for plotting funnel lines
+wh.lines <- wh.all %>%
+  distinct(step, maxx, minx)
+
+# data frame with dummies
+wh.dum <- wh.all %>%
+  distinct(step, dum) %>%
+  mutate(content = 'dummy',
+         number = dum) %>%
+  select(content, step, number)
+
+# data frame with rates
+conv <- wh.all$totnum[wh.all$content == 'sports entry - launch']   #create a value of the totnum of the last step
+
+wh.rates <- wh.all %>%
+  distinct(step, totnum) %>%  #keep only distincst of those 2 columns
+  mutate(prevnum = lag(totnum),   #for the last 3, CR is the % of 
+         rate = round(totnum / prevnum, 3)) %>% #for the others is the difference from previous step
+  select(step, rate)
+wh.rates <- na.omit(wh.rates) #keep only the CRs
+
+# creting final data frame
+wh.all <- wh.all %>%
+  select(content, step, number)
+
+wh.all <- rbind(wh.all, wh.dum)
+
+# defining order of steps
+wh.all$step <- factor(wh.all$step, levels = c('Game launch', 'Login', 'Visit'))
+wh.all <- wh.all %>%
+  arrange(desc(step))
+list1 <- wh.all %>% distinct(content) %>%
+  filter(content != 'dummy')
+wh.all$content <- factor(wh.all$content, levels = c(as.character(list1$content), 'dummy'))
+
+# calculating position of labels
+wh.all <- wh.all %>%
+  arrange(step, desc(content)) %>%
+  group_by(step) %>%
+  mutate(pos = cumsum(number) - 0.5*number) %>%
+  ungroup()
+
+# creating custom palette with 'white' color for dummies
+
+colswh <- c("#ebef02", "#00143C", "#00ADFF", 
+            "#ebef02", "#00143C", "#00ADFF", 
+            "#ebef02", "#00143C", "#00ADFF", "#ffffff")
+
+#00143C, #FAFF05, #00ADFF, #0059C2, #D1F0FF, #008CE6, #A1DBFF, #BFC4CE, #FEFFC1, #5EC2FF, #008CE6
+
+# plotting chart
+ggplot() +
+  theme_minimal() +
+  coord_flip() +
+  scale_fill_manual(values=colswh) +
+  geom_bar(data=wh.all, aes(x=step, y=number, fill=content), stat="identity", width=1) + #barras con colores
+  geom_text(data=wh.all[wh.all$content!='dummy', ],
+            aes(x=step, y=pos, label=paste0(round(number/1000000, 2), 'm')),
+            size=10, color='white', fontface="bold") +
+  geom_ribbon(data=wh.lines, aes(x=step, ymax=max(maxx), ymin=maxx, group=1), fill='white') +
+  geom_line(data=wh.lines, aes(x=step, y=maxx, group=1), color='#00143C', size=1) +
+  geom_ribbon(data=wh.lines, aes(x=step, ymax=minx, ymin=min(minx), group=1), fill='white') +
+  geom_line(data=wh.lines, aes(x=step, y=minx, group=1), color='#00143C', size=1) +
+#  geom_text(data=wh.rates, aes(x=step, y=(wh.lines$minx[-1]), label=paste0(rate*100, '%')), hjust=1.2,
+#            color='#00143C', fontface="bold") +
+  theme(legend.position='none', axis.ticks=element_blank(), axis.text.x=element_blank(), 
+        axis.title.x=element_blank())
+

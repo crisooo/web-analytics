@@ -1,0 +1,33 @@
+# Download or Load packages
+if(!require(RSiteCatalyst)) install.packages("RSiteCatalyst")
+library(RSiteCatalyst)
+if(!require(tidyverse)) install.packages("tidyverse")
+library(tidyverse)
+
+# Authentication & Set report suite
+SCAuth("<input key>", "<input secret>")
+my.rsid <- "whg-intl-prod-v3"
+
+
+# Check which metrics or elements you need
+metrics.available <- GetMetrics(my.rsid)
+elements.available <- GetElements(my.rsid)
+
+
+# Import the file of account Ids. You only need to change the name of the file
+selectedAccountNumbers <- as.vector(as.matrix(read_csv("list_of_referrers.csv")))
+
+# Choose dates and metrics/dimensions to query
+
+QueueRanked <- QueueRanked(my.rsid, 
+                           date.from = "2019-01-30",
+                           date.to = "2019-02-07", 
+                           metrics = "visits",
+                           elements = c("eVar11","referrer"),
+                           top = 50000,
+                           selected = selectedAccountNumbers,
+                           interval.seconds	= 60,
+                           max.attempts = 120
+) 
+
+write_csv(QueueRanked, "referrers.csv")

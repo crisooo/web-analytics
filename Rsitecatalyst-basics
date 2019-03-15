@@ -11,6 +11,9 @@ segments.available <- GetSegments(my.rsid)
 metrics.available <- GetMetrics(my.rsid)
 elements.available <- GetElements(my.rsid)
 evars.available <- GetEvars(my.rsid)
+props.available <- GetProps(my.rsid)
+calculatedmetrics.available <- GetCalculatedMetrics(my.rsid)  # Only shows simple calculated metrics (Formula between two metrics)
+
 
 # Metrics to export
 vegasVisits <- metrics.available$id[metrics.available$name == "Vegas - Visits"]
@@ -28,8 +31,9 @@ QueueRanked <- QueueRanked(my.rsid,
                              date.to = refDate - 1, 
                              metrics = myMetrics$id,
                              elements = "evar11",
-                             top = 50000,
-                             selected = selectedAccountNumbers,
+                             classification = "Lobbies"
+                             top = 50000,   # top = c(1,5), #gets top 1 for Lobbies and top 5 for eVar11
+                             selected = selectedAccountNumbers,  # overwrites the top
                              segment.id = segments.available$id[segments.available$name == "Tabs = Favourites"],
                              interval.seconds	= 60,
                              max.attempts = 120
@@ -54,4 +58,54 @@ AccountsRolling2 <- QueueTrended(my.rsid,
                                 top = 20
 ) 
 
-                             
+
+
+
+###### USEFUL DOCUMENTATION ######
+
+### Inline Segmentation
+# Segments based on Line Items, Classification Value or Multiple Segments
+# https://github.com/AdobeDocs/analytics-1.4-apis/blob/master/docs/reporting-api/inline_segments.md
+# A thread about segments and filtering: https://forums.adobe.com/thread/2509360
+
+### Avoiding the Rsitecatalyst package limitations	
+# SubmitJsonQueueReport - https://www.rdocumentation.org/packages/RSiteCatalyst/versions/1.4.15/topics/SubmitJsonQueueReport
+
+
+
+### Pulling larger data sets	
+# It may be that the amount of data you require is more than can reasonably be gathered through the API.
+# In that instance, other strategies used are, in rough order of performance:
+ # Export the raw data dump from Adobe Analytics into a database, then use R connectors for that.
+ # R is also integrated into Spark, so Hadoop/SparkR integrations are used.
+ # Export Data Warehouse exports via secure FTP to a folder, then read the csv files into R.
+ # Build robust scripts that retry timeouts from the API and batch and recombine data over a long period.
+
+
+### Using Spark for larger data set: http://datafeedtoolbox.com/how-to-setup-sparklyr-an-r-interface-for-apache-spark/
+
+### API response time	
+# Response times for the API is variable
+ # It can take anywhere between 10 seconds and 5 minutes or even timeout
+ # The size of the requested report doesnt´make much impact (within reason)
+ # Its recommended that you make a function to wrap around API calls to retry if an error detercted if used in automatic scripts
+ # The first call is the most expensive. subsequent calls are cached ? this is probably not true
+
+
+
+### 
+#
+#
+
+### 
+#
+#
+
+
+### 
+#
+#
+
+### 
+#
+#

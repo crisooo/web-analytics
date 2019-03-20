@@ -1,0 +1,112 @@
+## Querying behaviours from customers for date - x days
+
+
+#### Using Loops ####
+library(lubridate)
+library(RSiteCatalyst)
+library(tidyverse)
+
+# Get data
+accounts <- read_csv("NPSData.csv")
+accounts <- separate(accounts, Date, c("ActivityDt", "ActivityHour"), sep = " ", remove = TRUE)
+
+mydata <- accounts %>% 
+  filter(grepl('2019', ActivityDt))  %>% 
+  select(ActivityDt, `Account Number`)
+
+mydata$ActivityDt <- parse_date_time(mydata$ActivityDt, orders = "d%/%m/%Y")  
+mydata$ActivityDt <- as.Date(mydata$ActivityDt, format = "d%/%m/%Y")   
+colnames(mydata) <- c("NPSDate", "CustomerAccountNumber")
+
+#authentication
+SCAuth("XXX", "XXX")
+my.rsid <- "whg-intl-prod-v3"
+
+#the metrics you want. I have just one for this example
+myMetrics <- c("visits", "event180", "event182", "event183", "event184")
+
+#initiate an empty dataframe. Equivalently you could set it to NULL
+adobeData <- data.frame()
+
+#loop over distinct dates
+for (i in unique(mydata$NPSDate)){
+  
+  #Only accounts with this NPS date. I am doing it using base syntax here instead of tidyverse to save a few lines of code
+  selectedAccountNumbers <- mydata$CustomerAccountNumber[mydata$NPSDate == i]
+  
+  adobeDataTemp <- QueueRanked(my.rsid, 
+                               date.from = i - 7,
+                               date.to = i, 
+                               metrics = myMetrics,
+                               elements = "evar11",
+                               selected = selectedAccountNumbers,
+                               interval.seconds	= 60,
+                               max.attempts = 120) %>% 
+    select(-url, -segment.id, -segment.name)
+  
+  adobeData <- bind_rows(adobeData, adobeDataTemp)
+  
+}
+
+names(adobeData) <- c("CustomerAccountNumber", myMetrics$name)
+
+
+
+
+
+
+
+
+#### Using PURR ####
+
+library(lubridate)
+library(RSiteCatalyst)
+library(tidyverse)
+
+# Get data
+accounts <- read_csv("NPSData.csv")
+accounts <- separate(accounts, Date, c("ActivityDt", "ActivityHour"), sep = " ", remove = TRUE)
+
+mydata <- accounts %>% 
+  filter(grepl('2019', ActivityDt))  %>% 
+  select(ActivityDt, `Account Number`)
+
+mydata$ActivityDt <- parse_date_time(mydata$ActivityDt, orders = "d%/%m/%Y")    
+colnames(mydata) <- c("NPSDate", "CustomerAccountNumber")
+
+# Authentication & Set report suite
+SCAuth("XXX", "XXX")
+my.rsid <- "whg-intl-prod-v3"
+
+
+# Check which metrics or elements you need
+metrics.available <- GetMetrics(my.rsid)
+elements.available <- GetElements(my.rsid)
+
+#the metrics you want. I have just one for this example
+myMetrics <- c("visits", "event180", "event182", "event183", "event184")
+
+#myMetrics <- GetMetrics(my.rsid) %>% 
+ # filter(name == "DS - Visit - Section Must Drop Jackpots")
+
+#instead of the loop I use the map function of purrr
+#Basically map() takes a function (.f) and applies it to data (.x).
+adobeDataTempList <- map(.x = unique(mydata$NPSDate), 
+                         .f = ~ QueueRanked(my.rsid, 
+                                            date.from = . - 7,
+                                            date.to = ., 
+                                            metrics = myMetrics,
+                                            elements = c("eVar11","eVar111"),
+                                            selected = mydata$CustomerAccountNumber[mydata$NPSDate == .],
+                                            interval.seconds	= 60,
+                                            max.attempts = 300) %>% 
+                           select(-url, -segment.id, -segment.name))
+
+adobeData <- bind_rows(adobeDataTempList)
+
+names(adobeData) <- c("CustomerAccountNumber", myMetrics$name)
+
+
+
+
+

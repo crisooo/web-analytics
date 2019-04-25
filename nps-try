@@ -1,0 +1,149 @@
+
+######### GAR #########
+
+library(lubridate)
+library(RSiteCatalyst)
+library(tidyverse)
+
+# Authentication & Set report suite
+SCAuth("xxxx", "x")
+my.rsid <- "reporting-suite"
+
+# Get data
+setwd("G:/whatev/whatev/whatev)
+accounts <- read_csv("NPSData.csv")
+
+# Select only the columns we need and modify the date to remove time
+mydata <- accounts %>% 
+  select(CustomerAccountNumber =`Account Number`, NPSDate = Date) %>% 
+  mutate(NPSDate = date(dmy_hm(NPSDate)))
+
+
+# Check which metrics or elements you need and select them
+metrics.available <- GetMetrics(my.rsid)
+elements.available <- GetElements(my.rsid)
+
+myMetrics <- c("visits", "event180", "event182", "event183", "event184")
+
+
+# Make a function that gets NPS data for a single date.
+funk <- function(x) {
+  QueueRanked(
+    my.rsid,
+    date.from = x - 7,
+    date.to = x,
+    metrics = myMetrics,
+    elements = c("eVar11", "eVar111"),
+    selected = mydata$CustomerAccountNumber[mydata$NPSDate == x],
+    interval.seconds = 60,
+    max.attempts = 300)
+}
+
+#instead of the loop I use the map function of purrr
+# Basically map() takes a function (.f) and applies it to data (.x).
+adobeDataTempList <- map(.x = unique(mydata$NPSDate), 
+                         .f = funk
+                     )
+
+adobeData <- bind_rows(adobeDataTempList)
+
+names(adobeData) <- c("CustomerAccountNumber", myMetrics$name)
+
+
+
+
+
+######### PURR #########
+
+library(lubridate)
+library(RSiteCatalyst)
+library(tidyverse)
+
+# Authentication & Set report suite
+SCAuth("xxxx", "x")
+my.rsid <- "reporting-suite"
+
+# Get data
+setwd("G:/whatev/whatev/whatev)
+accounts <- read_csv("NPSData.csv")
+
+# Select only the columns we need and modify the date to remove time
+mydata <- accounts %>% 
+  select(CustomerAccountNumber =`Account Number`, NPSDate = Date) %>% 
+  mutate(NPSDate = date(dmy_hm(NPSDate)))
+
+
+# Check which metrics or elements you need and select them
+metrics.available <- GetMetrics(my.rsid)
+elements.available <- GetElements(my.rsid)
+
+myMetrics <- c("visits", "event180", "event182", "event183", "event184")
+
+#instead of the loop I use the map function of purrr
+# Basically map() takes a function (.f) and applies it to data (.x).
+adobeDataTempList <- map(.x = unique(mydata$NPSDate), 
+                         .f = ~ QueueRanked(my.rsid, 
+                                            date.from = . - 7,
+                                            date.to = ., 
+                                            metrics = myMetrics,
+                                            elements = c("eVar11","eVar111"),
+                                            selected = mydata$CustomerAccountNumber[mydata$NPSDate == .],
+                                            interval.seconds	= 60,
+                                            max.attempts = 300)# %>% 
+                     #      select(-url, -segment.id, -segment.name)
+                     )
+
+adobeData <- bind_rows(adobeDataTempList)
+
+names(adobeData) <- c("CustomerAccountNumber", myMetrics$name)
+
+
+######### LOOPS #########
+
+library(lubridate)
+library(RSiteCatalyst)
+library(tidyverse)
+
+# Authentication & Set report suite
+SCAuth("xxxx", "x")
+my.rsid <- "reporting-suite"
+
+# Get data
+setwd("G:/whatev/whatev/whatev)
+accounts <- read_csv("NPSData.csv")
+
+# Select only the columns we need and modify the date to remove time
+mydata <- accounts %>% 
+  select(CustomerAccountNumber =`Account Number`, NPSDate = Date) %>% 
+  mutate(NPSDate = date(dmy_hm(NPSDate)))
+
+
+# Check which metrics or elements you need and select them
+metrics.available <- GetMetrics(my.rsid)
+elements.available <- GetElements(my.rsid)
+
+myMetrics <- c("visits", "event180", "event182", "event183", "event184")
+
+
+# Make a function that gets NPS data for a single date.
+funk <- function(x) {
+  QueueRanked(
+    my.rsid,
+    date.from = x - 7,
+    date.to = x,
+    metrics = myMetrics,
+    elements = c("eVar11", "eVar111"),
+    selected = mydata$CustomerAccountNumber[mydata$NPSDate == x],
+    interval.seconds = 60,
+    max.attempts = 300)
+}
+
+#instead of the loop I use the map function of purrr
+# Basically map() takes a function (.f) and applies it to data (.x).
+adobeDataTempList <- map(.x = unique(mydata$NPSDate), 
+                         .f = funk
+                     )
+
+adobeData <- bind_rows(adobeDataTempList)
+
+names(adobeData) <- c("CustomerAccountNumber", myMetrics$name)
